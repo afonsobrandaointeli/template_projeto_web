@@ -1,29 +1,38 @@
-require('dotenv').config();
-const express = require('express');
-const app = express();
-const db = require('./config/db');
+const fs = require('fs').promises;
 const path = require('path');
+const { testConnection, executeSqlFile } = require('./config/database');
+const ProdutoModel = require('./models/produto');
 
-db.connect()
-  .then(() => {
-    console.log('Conectado ao banco de dados PostgreSQL');
+async function iniciarAplicacao() {
+  console.log('Iniciando aplicação...');
+  
+  // Testar conexão com o banco de dados
+  const conexaoOk = await testConnection();
+  if (!conexaoOk) {
+    console.error('Não foi possível conectar ao banco de dados. Encerrando aplicação.');
+    process.exit(1);
+  }
+  
+  // Ler e executar arquivo de migração
+  try {    
+    // Buscar produtos com JOIN
+    console.log('\n--- CONSULTA DE PRODUTOS COM JOIN ---');
+    const produtos = await ProdutoModel.buscarTodosComDetalhes();
+    console.table(produtos);
+    
+    // Gerar relatório
+    console.log('\n--- RELATÓRIO DE PRODUTOS POR CATEGORIA ---');
+    const relatorio = await ProdutoModel.gerarRelatorioPorCategoria();
+    console.table(relatorio);
+    
+    console.log('\nAplicação executada com sucesso!');
+    
+    // Encerrar o programa após a execução
+    process.exit(0);
+  } catch (error) {
+    console.error('Erro ao executar aplicação:', error);
+    process.exit(1);
+  }
+}
 
-    app.use(express.json());
-
-    app.get('/', async (req, res) => {
-        try {
-            const result = await db.query('SELECT NOW()');
-            res.send(`Hora atual no banco: ${result.rows[0].now}`);
-        } catch (err) {
-            res.status(500).send('Erro ao conectar com o banco.');
-        }
-    });
-
-    const PORT = process.env.PORT || 3000;
-    app.listen(PORT, () => {
-      console.log(`Servidor rodando na porta ${PORT}`);
-    });
-  })
-  .catch(err => {
-    console.error('Erro ao conectar ao banco de dados:', err);
-  });
+iniciarAplicacao();
